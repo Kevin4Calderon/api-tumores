@@ -19,20 +19,18 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'dcm'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['RESULT_FOLDER'] = RESULT_FOLDER
 
-# Crear carpetas si no existen
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 # =========================
-# VALIDAR EXTENSION
+# VALIDAR ARCHIVO
 # =========================
 
 def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # =========================
-# PAGINA WEB
+# FRONTEND (WEB)
 # =========================
 
 @app.route('/', methods=['GET', 'POST'])
@@ -52,24 +50,12 @@ def upload_file():
 
             filename = secure_filename(file.filename)
 
-            filepath = os.path.join(
-                app.config['UPLOAD_FOLDER'],
-                filename
-            )
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
             file.save(filepath)
 
-            # =========================
-            # DETECCION
-            # =========================
-
             detector = TumorDetector()
-
             result = detector.detect_tumor(filepath)
-
-            # =========================
-            # VISUALIZACIONES
-            # =========================
 
             base_name = os.path.splitext(filename)[0]
 
@@ -90,48 +76,31 @@ def upload_file():
     return render_template('index.html')
 
 # =========================
-# API PARA n8n
+# API PARA N8N
 # =========================
 
 @app.route('/analyze', methods=['POST'])
 def analyze_image():
 
     try:
-
         if 'file' not in request.files:
-            return jsonify({
-                "error": "No se envio archivo"
-            }), 400
+            return jsonify({"error": "No se envio archivo"}), 400
 
         file = request.files['file']
 
         if file.filename == '':
-            return jsonify({
-                "error": "Archivo vacio"
-            }), 400
+            return jsonify({"error": "Archivo vacio"}), 400
 
         if file and allowed_file(file.filename):
 
             filename = secure_filename(file.filename)
 
-            filepath = os.path.join(
-                app.config['UPLOAD_FOLDER'],
-                filename
-            )
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
             file.save(filepath)
 
-            # =========================
-            # DETECCION
-            # =========================
-
             detector = TumorDetector()
-
             result = detector.detect_tumor(filepath)
-
-            # =========================
-            # GENERAR IMAGENES
-            # =========================
 
             base_name = os.path.splitext(filename)[0]
 
@@ -141,36 +110,21 @@ def analyze_image():
                 base_name
             )
 
+            # 🔥 FIX IMPORTANTE: convertir bool a string
             return jsonify({
-
-                "has_tumor": result['has_tumor'],
-
-                "confidence": round(
-                    float(result['confidence']), 2
-                ),
-
+                "has_tumor": str(result['has_tumor']),
+                "confidence": float(round(result['confidence'], 2)),
                 "images": result_images
-
             })
 
-        return jsonify({
-            "error": "Formato no permitido"
-        }), 400
+        return jsonify({"error": "Formato no permitido"}), 400
 
     except Exception as e:
-
-        return jsonify({
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 # =========================
-# INICIO
+# RUN
 # =========================
 
 if __name__ == '__main__':
-
-    app.run(
-        host='0.0.0.0',
-        port=5000,
-        debug=True
-    )
+    app.run(host='0.0.0.0', port=5000)
