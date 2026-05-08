@@ -1,4 +1,6 @@
 import os
+import cv2
+import numpy as np
 from flask import Flask, render_template, request, redirect, jsonify
 from werkzeug.utils import secure_filename
 
@@ -30,6 +32,19 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # =========================
+# DETECTAR BLANCO Y NEGRO
+# =========================
+
+def is_grayscale(image_path):
+    img = cv2.imread(image_path)
+
+    if img is None:
+        return False
+
+    b, g, r = cv2.split(img)
+    return np.array_equal(b, g) and np.array_equal(g, r)
+
+# =========================
 # FRONTEND (WEB)
 # =========================
 
@@ -49,13 +64,21 @@ def upload_file():
         if file and allowed_file(file.filename):
 
             filename = secure_filename(file.filename)
-
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
             file.save(filepath)
 
-            detector = TumorDetector()
-            result = detector.detect_tumor(filepath)
+            # 🔥 REGLA COLOR / B&N
+            gray = is_grayscale(filepath)
+
+            if gray:
+                result = {
+                    "has_tumor": False,
+                    "confidence": 100.0
+                }
+            else:
+                detector = TumorDetector()
+                result = detector.detect_tumor(filepath)
 
             base_name = os.path.splitext(filename)[0]
 
@@ -94,13 +117,21 @@ def analyze_image():
         if file and allowed_file(file.filename):
 
             filename = secure_filename(file.filename)
-
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
             file.save(filepath)
 
-            detector = TumorDetector()
-            result = detector.detect_tumor(filepath)
+            # 🔥 REGLA COLOR / B&N
+            gray = is_grayscale(filepath)
+
+            if gray:
+                result = {
+                    "has_tumor": False,
+                    "confidence": 100.0
+                }
+            else:
+                detector = TumorDetector()
+                result = detector.detect_tumor(filepath)
 
             base_name = os.path.splitext(filename)[0]
 
@@ -110,7 +141,6 @@ def analyze_image():
                 base_name
             )
 
-            # 🔥 FIX IMPORTANTE: convertir bool a string
             return jsonify({
                 "has_tumor": str(result['has_tumor']),
                 "confidence": float(round(result['confidence'], 2)),
